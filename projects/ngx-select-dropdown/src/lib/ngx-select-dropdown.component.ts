@@ -1,4 +1,6 @@
-import { FilterByPipe } from './pipes/filter-by.pipe';
+import { NgxDropdownConfig } from "./types/ngx-select-dropdown.types";
+import { SelectDropDownService } from "./ngx-select-dropdown.service";
+import { FilterByPipe } from "./pipes/filter-by.pipe";
 import {
   Component,
   OnInit,
@@ -14,12 +16,31 @@ import {
   AfterViewInit,
   ChangeDetectorRef,
   forwardRef,
-} from '@angular/core';
-import { NG_VALUE_ACCESSOR } from '@angular/forms';
+  ViewChild,
+  HostBinding,
+  TemplateRef,
+} from "@angular/core";
+import { NG_VALUE_ACCESSOR } from "@angular/forms";
+const config: NgxDropdownConfig = {
+  displayKey: "description",
+  height: "auto",
+  search: false,
+  placeholder: "Select",
+  searchPlaceholder: "Search...",
+  limitTo: 0,
+  customComparator: undefined,
+  noResultsFound: "No results found!",
+  moreText: "more",
+  searchOnKey: null,
+  clearOnSelection: false,
+  inputDirection: "ltr",
+  selectAllLabel: "Select all",
+  enableSelectAll: false,
+};
 @Component({
-  selector: 'ngx-select-dropdown',
-  templateUrl: './ngx-select-dropdown.component.html',
-  styleUrls: ['./ngx-select-dropdown.component.scss'],
+  selector: "ngx-select-dropdown",
+  templateUrl: "./ngx-select-dropdown.component.html",
+  styleUrls: ["./ngx-select-dropdown.component.scss"],
   providers: [
     {
       provide: NG_VALUE_ACCESSOR,
@@ -29,7 +50,8 @@ import { NG_VALUE_ACCESSOR } from '@angular/forms';
   ],
 })
 export class NgxSelectDropdownComponent
-  implements OnInit, OnChanges, AfterViewInit {
+  implements OnInit, OnChanges, AfterViewInit
+{
   /** value of the dropdown */
   @Input() public _value: any;
 
@@ -41,7 +63,7 @@ export class NgxSelectDropdownComponent
   /**
    * configuration options
    */
-  @Input() public config: any = {};
+  @Input() public config: NgxDropdownConfig = config;
 
   /**
    * Whether multiple selection or single selection allowed
@@ -49,9 +71,24 @@ export class NgxSelectDropdownComponent
   @Input() public multiple = false;
 
   /**
-   * Value
+   * Flag to disbale the dropdown
    */
   @Input() public disabled: boolean;
+
+  /** unique identifier to uniquely identify particular instance */
+  @Input() public instanceId: any;
+
+  /** Template ref for the selected item */
+  @Input() selectedItemTemplate: TemplateRef<any>;
+
+  /** Template ref for the avilable item */
+  @Input() optionItemTemplate: TemplateRef<any>;
+
+  /** Template ref for the no matched found case */
+  @Input() notFoundTemplate: TemplateRef<any>;
+
+  /** Template ref for the button */
+  @Input() dropdownButtonTemplate: TemplateRef<any>;
 
   /**
    * change event when value changes to provide user to handle things in change event
@@ -91,7 +128,7 @@ export class NgxSelectDropdownComponent
   /**
    * Selection text to be Displayed
    */
-  public selectedDisplayText = 'Select';
+  public selectedDisplayText = "Select";
 
   /**
    * Search text
@@ -118,10 +155,32 @@ export class NgxSelectDropdownComponent
    */
 
   public showNotFound = false;
+
+  /**
+   * The position from the top of the element in pixels to drop according to the visibility in viewport
+   */
+  public top: string;
+
+  /**
+   * Flag to indicate that the click initiation was on one of the availabe or selected options
+   * This is to track the mouse down event especially in Safari.
+   */
+  public optionMouseDown: boolean;
+
+  /**
+   * Element ref of the dropdown list DOM element
+   */
+  private dropdownList: ElementRef;
+
+  /**
+   * Flag for select all option
+   */
+  public selectAll: boolean;
+
   /**
    * Hold the reference to available items in the list to focus on the item when scrolling
    */
-  @ViewChildren('availableOption')
+  @ViewChildren("availableOption")
   public availableOptions: QueryList<ElementRef>;
 
   get value() {
@@ -135,46 +194,72 @@ export class NgxSelectDropdownComponent
 
   constructor(
     private cdref: ChangeDetectorRef,
-    public _elementRef: ElementRef
+    public _elementRef: ElementRef,
+    private dropdownService: SelectDropDownService
   ) {
     this.multiple = false;
+    this.selectAll = false;
   }
 
   public onChange: any = () => {
     // empty
-  }
+  };
   public onTouched: any = () => {
     // empty
-  }
+  };
 
   /**
    * click listener for host inside this component i.e
    * if many instances are there, this detects if clicked inside
    * this instance
    */
-  @HostListener('click')
+  @HostListener("click")
   public clickInsideComponent() {
     this.clickedInside = true;
   }
-
-  @HostListener('blur') public blur() {
-    this.toggleDropdown = false;
+  /**
+   * View reference for the dorpdown list
+   */
+  @ViewChild("dropdownList") set dropDownElement(ref: ElementRef) {
+    if (ref) {
+      // initially setter gets called with undefined
+      this.dropdownList = ref;
+    }
   }
 
-  @HostListener('focus') public focus() {
+  /**
+   * Event listener for the blur event to hide the dropdown
+   */
+  @HostListener("blur") public blur($event: Event) {
+    if (
+      !this.insideKeyPress &&
+      !this.optionMouseDown &&
+      $event instanceof KeyboardEvent
+    ) {
+      this.toggleDropdown = false;
+      this.openStateChange();
+    }
+  }
+
+  /**
+   * Event listener for the focus event to show the dropdown when using tab key
+   */
+  @HostListener("focus") public focus() {
     /* istanbul ignore else */
     if (!this.disabled) {
-      this.toggleSelectDropdown();
+      this.toggleDropdown = true;
+      this.openStateChange();
     }
   }
   /**
    * click handler on documnent to hide the open dropdown if clicked outside
    */
-  @HostListener('document:click')
+  @HostListener("document:click")
   public clickOutsideComponent() {
     /* istanbul ignore else */
     if (!this.clickedInside) {
       this.toggleDropdown = false;
+      this.openStateChange();
       this.resetArrowKeyActiveElement();
       // clear searh on close
       this.searchText = null;
@@ -186,24 +271,31 @@ export class NgxSelectDropdownComponent
   /**
    * click handler on documnent to hide the open dropdown if clicked outside
    */
-  @HostListener('document:keydown')
+  @HostListener("document:keydown")
   public KeyPressOutsideComponent() {
     /* istanbul ignore else */
     if (!this.insideKeyPress) {
       this.toggleDropdown = false;
+      this.openStateChange();
       this.resetArrowKeyActiveElement();
     }
     this.insideKeyPress = false;
   }
+
+  /**
+   * Binding to set the tabindex property to set to 0 for accessibilty
+   */
+  @HostBinding("attr.tabindex") tabindex = 0;
   /**
    * Event handler for key up and down event and enter press for selecting element
    */
-  @HostListener('keydown', ['$event'])
+  @HostListener("keydown", ["$event"])
   public handleKeyboardEvent($event: KeyboardEvent | any) {
     this.insideKeyPress = true;
     /* istanbul ignore else */
     if ($event.keyCode === 27 || this.disabled) {
       this.toggleDropdown = false;
+      this.openStateChange();
       this.insideKeyPress = false;
       return;
     }
@@ -211,6 +303,7 @@ export class NgxSelectDropdownComponent
     /* istanbul ignore else */
     if ($event.keyCode !== 9 && avaOpts.length === 0 && !this.toggleDropdown) {
       this.toggleDropdown = true;
+      this.openStateChange();
     }
     // Arrow Down
     /* istanbul ignore else */
@@ -255,12 +348,48 @@ export class NgxSelectDropdownComponent
    */
   public ngOnInit() {
     /* istanbul ignore else */
-    if (typeof this.options !== 'undefined' && typeof this.config !== 'undefined' && Array.isArray(this.options)) {
+    if (
+      typeof this.options !== "undefined" &&
+      typeof this.config !== "undefined" &&
+      Array.isArray(this.options)
+    ) {
       this.availableItems = [
         ...this.options.sort(this.config.customComparator),
       ];
       this.initDropdownValuesAndOptions();
     }
+    this.serviceSubscriptions();
+  }
+
+  isVisible() {
+    if (!this.dropdownList) {
+      return { visible: false, element: null };
+    }
+    const el = this.dropdownList.nativeElement;
+    if (!el) {
+      return { visible: false, element: el };
+    }
+    const rect = el.getBoundingClientRect();
+    const topShown = rect.top >= 0;
+    const bottomShown = rect.bottom <= window.innerHeight;
+    return { visible: topShown && bottomShown, element: el };
+  }
+
+  serviceSubscriptions() {
+    this.dropdownService.openDropdownInstance.subscribe((instanceId) => {
+      if (this.instanceId === instanceId) {
+        this.toggleDropdown = true;
+        this.openStateChange();
+        this.resetArrowKeyActiveElement();
+      }
+    });
+    this.dropdownService.closeDropdownInstance.subscribe((instanceId) => {
+      if (this.instanceId === instanceId) {
+        this.toggleDropdown = false;
+        this.openStateChange();
+        this.resetArrowKeyActiveElement();
+      }
+    });
   }
 
   /**
@@ -316,7 +445,9 @@ export class NgxSelectDropdownComponent
   }
 
   public reset() {
-    if (!this.config) return;
+    if (!this.config) {
+      return;
+    }
     this.selectedItems = [];
     this.availableItems = [...this.options.sort(this.config.customComparator)];
     this.initDropdownValuesAndOptions();
@@ -325,7 +456,10 @@ export class NgxSelectDropdownComponent
    * function sets whether to show items not found text or not
    */
   public setNotFoundState() {
-    if (this.availableOptions.length === 0) {
+    if (
+      this.availableOptions.length === 0 &&
+      this.selectedItems.length !== this.options.length
+    ) {
       this.showNotFound = true;
     } else {
       this.showNotFound = false;
@@ -336,7 +470,9 @@ export class NgxSelectDropdownComponent
    * Component onchage i.e when any of the input properties change
    */
   public ngOnChanges(changes: SimpleChanges) {
-    if (!this.config) return;
+    if (!this.config) {
+      return;
+    }
     this.selectedItems = [];
     // this.searchText = null;
     this.options = this.options || [];
@@ -351,7 +487,7 @@ export class NgxSelectDropdownComponent
       /* istanbul ignore else */
       if (
         JSON.stringify(changes.value.currentValue) === JSON.stringify([]) ||
-        changes.value.currentValue === '' ||
+        changes.value.currentValue === "" ||
         changes.value.currentValue === null
       ) {
         this.availableItems = [
@@ -385,6 +521,9 @@ export class NgxSelectDropdownComponent
     /* istanbul ignore else */
     if (!Array.isArray(this.value)) {
       this.value = [];
+    }
+    if (!this.areAllSelected()) {
+      this.selectAll = false;
     }
     this.valueChanged();
     this.resetArrowKeyActiveElement();
@@ -424,6 +563,10 @@ export class NgxSelectDropdownComponent
     this.selectedItems.sort(this.config.customComparator);
     this.availableItems.sort(this.config.customComparator);
     // this.searchText = null;
+    /* istanbul ignore else */
+    if (this.areAllSelected()) {
+      this.selectAll = true;
+    }
     this.valueChanged();
     this.resetArrowKeyActiveElement();
   }
@@ -441,15 +584,40 @@ export class NgxSelectDropdownComponent
   /**
    * Toggle the dropdownlist on/off
    */
-  public toggleSelectDropdown() {
-    this.toggleDropdown = !this.toggleDropdown;
+  public openSelectDropdown() {
+    this.toggleDropdown = true;
+    this.top = "30px";
+    this.openStateChange();
+    this.resetArrowKeyActiveElement();
+    setTimeout(() => {
+      const { visible, element } = this.isVisible();
+      if (element) {
+        this.top = visible
+          ? "30px"
+          : `-${element.getBoundingClientRect().height}px`;
+      }
+    }, 3);
+  }
+
+  public closeSelectDropdown() {
+    this.toggleDropdown = false;
+    this.openStateChange();
+    this.resetArrowKeyActiveElement();
+  }
+
+  public openStateChange() {
     if (this.toggleDropdown) {
+      this.dropdownService.openInstances.push(this.instanceId);
       this.open.emit();
     } else {
       this.searchText = null;
+      this.optionMouseDown = false;
       this.close.emit();
+      this.dropdownService.openInstances.splice(
+        this.dropdownService.openInstances.indexOf(this.instanceId),
+        1
+      );
     }
-    this.resetArrowKeyActiveElement();
   }
 
   /**
@@ -467,22 +635,11 @@ export class NgxSelectDropdownComponent
    * initialize the config and other properties
    */
   private initDropdownValuesAndOptions() {
-    const config: any = {
-      displayKey: 'description',
-      height: 'auto',
-      search: false,
-      placeholder: 'Select',
-      searchPlaceholder: 'Search...',
-      limitTo: 0,
-      customComparator: undefined,
-      noResultsFound: 'No results found!',
-      moreText: 'more',
-      searchOnKey: null,
-      clearOnSelection: false,
-      inputDirection: 'ltr',
-    };
     /* istanbul ignore else */
-    if (this.config === 'undefined' || Object.keys(this.config).length === 0) {
+    if (
+      typeof this.config === "undefined" ||
+      Object.keys(this.config).length === 0
+    ) {
       this.config = { ...config };
     }
     for (const key of Object.keys(config)) {
@@ -490,12 +647,12 @@ export class NgxSelectDropdownComponent
     }
     this.config = { ...this.config };
     // Adding placeholder in config as default param
-    this.selectedDisplayText = this.config['placeholder'];
+    this.selectedDisplayText = this.config["placeholder"];
     /* istanbul ignore else */
-    if (this.value !== '' && typeof this.value !== 'undefined') {
+    if (this.value !== "" && typeof this.value !== "undefined") {
       if (Array.isArray(this.value)) {
         this.selectedItems = this.value;
-      } else if (this.value !== '' && this.value !== null) {
+      } else if (this.value !== "" && this.value !== null) {
         this.selectedItems[0] = this.value;
       } else {
         this.selectedItems = [];
@@ -520,7 +677,7 @@ export class NgxSelectDropdownComponent
   private setSelectedDisplayText() {
     let text: string = this.selectedItems[0];
     /* istanbul ignore else */
-    if (typeof this.selectedItems[0] === 'object') {
+    if (typeof this.selectedItems[0] === "object") {
       text = this.config.displayFn
         ? this.config.displayFn(this.selectedItems[0])
         : this.selectedItems[0][this.config.displayKey];
@@ -581,5 +738,32 @@ export class NgxSelectDropdownComponent
    */
   private resetArrowKeyActiveElement() {
     this.focusedItemIndex = null;
+  }
+
+  /**
+   * Toggle the select all option
+   */
+  public toggleSelectAll(close?: boolean, emitChange?: boolean): void {
+    this.selectAll = !this.selectAll;
+    if (this.selectAll) {
+      this.selectedItems = [...this.selectedItems, ...this.availableItems];
+      this.availableItems = [];
+    } else {
+      this.availableItems = [...this.selectedItems, ...this.availableItems];
+      this.selectedItems = [];
+    }
+    this.selectedItems.sort(this.config.customComparator);
+    this.availableItems.sort(this.config.customComparator);
+    this.valueChanged();
+    this.closeSelectDropdown();
+    this.openStateChange();
+    this.resetArrowKeyActiveElement();
+  }
+
+  /**
+   * Check if all options selected
+   */
+  areAllSelected() {
+    return this.selectedItems.length === this.options.length;
   }
 }

@@ -4,11 +4,11 @@
 [![npm](https://img.shields.io/npm/v/ngx-select-dropdown.svg)]()
 [![Build Status](https://travis-ci.org/manishjanky/ngx-select-dropdown.svg?branch=master)](https://travis-ci.org/manishjanky/ngx-select-dropdown)
 [![Codecov branch](https://codecov.io/gh/manishjanky/ngx-select-dropdown/branch/master/graphs/badge.svg)]()
-[![npm](https://img.shields.io/npm/dt/ngx-select-dropdown.svg)]()
+![npm](https://img.shields.io/npm/dy/ngx-select-dropdown)
 [![GitHub top language](https://img.shields.io/github/languages/top/manishjanky/ngx-select-dropdown.svg)]()
 [![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/manishjanky/ngx-select-dropdown.svg)]()
 
-`ngx-select-dropdown` Custom Dropdown component for Angular 4+ with multiple and single selection options
+`ngx-select-dropdown` Custom Dropdown component for Angular 4+ with multiple and single selection options, with customization options
 
 ## Features
 * single select dropdown
@@ -20,6 +20,7 @@
 * angular forms support
 * angular v4 and above supported
 * cross browser support
+* custom template options
 
 
 ## Examples
@@ -60,21 +61,38 @@ class YourModule { ... }
 * use `<ngx-select-dropdown></ngx-select-dropdown>` in your templates to add the custom dropdown in your view like below
 
 ````
-<ngx-select-dropdown (change)="selectionChanged($event)" [multiple]="true" [(ngModel)]="dataModel" [config]="config" [options]="dropdownOptions"></ngx-select-dropdown>
+<ngx-select-dropdown [instanceId]="'instance1'" (change)="selectionChanged($event)" [multiple]="true" [(ngModel)]="dataModel" [config]="config" [options]="dropdownOptions"></ngx-select-dropdown>
 ````
 * use with reactive form like
 ````
-<ngx-select-dropdown (change)="selectionChanged($event)" formControlName="selectData" [multiple]="true" [config]="config" [options]="dropdownOptions"></ngx-select-dropdown>
+<ngx-select-dropdown [instanceId]="'instance2'"  (change)="selectionChanged($event)" formControlName="selectData" [multiple]="true" [config]="config" [options]="dropdownOptions"></ngx-select-dropdown>
+````
+* use custom templates options like below. `item` and `config` variables available in the template context
+````
+<ng-template #optionTemplate let-item="item" let-config="config">
+  <i class="fa fa-plus"></i>
+  {{item.name}}
+  <span class="new badge"></span>
+</ng-template>
+
+<ngx-select-dropdown [optionItemTemplate]="optionTemplate" [selectedItemTemplate]="optionTemplate" tabindex="0" [multiple]="true" [(ngModel)]="modelVar" [options]="options"
+[config]="config">
+</ngx-select-dropdown>
 ````
 
-## Config
+## Configuration
 
 ### Input
 
 * `multiple: boolean` - `true/false` beased if multiple selection required or not `Defaults to false`.
 * `options: Array` - Array of string/objects that are to be the dropdown options.
 * `disabled: boolean` - disabled attribute to disable the dropdown when required.
-* `config: Object` - configuration object.
+* `instanceId: any` - instanceId of the dropdwon component instance.
+* `config: NgxDropdownConfig` - configuration object.
+* `selectedItemTemplate: TemplateRef` - Custom template ref for the selected item
+* `optionItemTemplate: TemplateRef` - Custom template ref for the options items(available options)
+* `dropdownButtonTemplate: TemplateRef` - Custom template ref for the dropdwon button element
+* `notFoundTemplate: TemplateRef` - Custom template ref for the no matched found message
 ````
 config = {
         displayFn:(item: any) => { return item.hello.world; } //to support flexible text displaying for each item
@@ -90,6 +108,8 @@ config = {
         searchOnKey: 'name' // key on which search should be performed this will be selective search. if undefined this will be extensive search on all keys
         clearOnSelection: false // clears search criteria when an option is selected if set to true, default is false
         inputDirection: 'ltr' // the direction of the search input can be rtl or ltr(default)
+        selectAllLabel: 'Select all' // label that is displayed in multiple selection for select all
+        enableSelectAll: false, // enable select all option to select all available items, default is false
       }
 ````
 
@@ -99,6 +119,12 @@ config = {
 * `open: Event` - open event when the dropdown toogles on
 * `close: Event` - close event when the dropdown toogles off
 * `searchChange: Event` - search change event when the search text changes
+
+### Dropdown service
+* `openDropdown(instanceId:string)` - method to open a particular dropdown instance
+* `closeDropdown(instanceId:string)` - method to close a particular dropdown instance
+* `isOpen(instanceId:string)` - method to check if a particular instance dropdown is open
+* `openInstances` - instanceId list of all the open instances
 
 ### Change detection
 
@@ -192,6 +218,26 @@ Add disabled class to different items based on item.disabled
 ````
 Angular library approach opted for development
 Angular Ivy compatibility
+````
+* v3.0.0
+````
+Dropdown singleton service to interact with dropdown instances
+Instance identifier
+Upgraded to Angular v14 development environment
+````
+* v3.0.1
+````
+Auto drop based on the screen position
+Over-ride css styles for available and selected items using class names `selected-item(s)` and `available-item(s)`
+````
+* v3.2.0
+````
+Ability to select all available items using a select all checkbox
+````
+* v3.3.0
+````
+Custom templates for available options, selected items and the dropdown button
+Other minor fixes
 ````
 ## Help Improve
 

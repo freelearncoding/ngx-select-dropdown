@@ -9,11 +9,24 @@
       "sourceRoot": "projects/ngx-select-dropdown/src",
       "prefix": "ngx",
       "architect": {
+        "lint":{
+          "builder": "@angular-eslint/builder:lint",
+          "options": {
+            "eslintConfig":".eslintrc.js",
+            "lintFilePatterns": [
+              "projects/ngx-select-dropdown/src/**/*.ts"
+            ]
+          }
+        },
         "build": {
           "builder": "@angular-devkit/build-ng-packagr:build",
           "options": {
             "tsConfig": "projects/ngx-select-dropdown/tsconfig.lib.json",
             "project": "projects/ngx-select-dropdown/ng-package.json"
+          },
+          "configurations": {
+            "production": {
+            }
           }
         },
         "test": {
@@ -21,19 +34,8 @@
           "options": {
             "main": "projects/ngx-select-dropdown/src/test.ts",
             "tsConfig": "projects/ngx-select-dropdown/tsconfig.spec.json",
-            "karmaConfig": "projects/ngx-select-dropdown/karma.conf.js"
-          }
-        },
-        "lint": {
-          "builder": "@angular-devkit/build-angular:tslint",
-          "options": {
-            "tsConfig": [
-              "projects/ngx-select-dropdown/tsconfig.lib.json",
-              "projects/ngx-select-dropdown/tsconfig.spec.json"
-            ],
-            "exclude": [
-              "**/node_modules/**"
-            ]
+            "karmaConfig": "projects/ngx-select-dropdown/karma.conf.js",
+            "codeCoverage": true
           }
         }
       }
@@ -69,7 +71,13 @@
             "scripts": [
               "./node_modules/jquery/dist/jquery.min.js",
               "./node_modules/materialize-css/dist/js/materialize.js"
-            ]
+            ],
+            "vendorChunk": true,
+            "extractLicenses": false,
+            "buildOptimizer": false,
+            "sourceMap": true,
+            "optimization": false,
+            "namedChunks": true
           },
           "configurations": {
             "production": {
@@ -82,7 +90,6 @@
               "optimization": true,
               "outputHashing": "all",
               "sourceMap": false,
-              "extractCss": true,
               "namedChunks": false,
               "aot": true,
               "extractLicenses": true,
@@ -101,7 +108,8 @@
                 }
               ]
             }
-          }
+          },
+          "defaultConfiguration": ""
         },
         "serve": {
           "builder": "@angular-devkit/build-angular:dev-server",
@@ -137,19 +145,6 @@
             "scripts": []
           }
         },
-        "lint": {
-          "builder": "@angular-devkit/build-angular:tslint",
-          "options": {
-            "tsConfig": [
-              "projects/demo/tsconfig.app.json",
-              "projects/demo/tsconfig.spec.json",
-              "projects/demo/e2e/tsconfig.json"
-            ],
-            "exclude": [
-              "**/node_modules/**"
-            ]
-          }
-        },
         "e2e": {
           "builder": "@angular-devkit/build-angular:protractor",
           "options": {
@@ -163,6 +158,6 @@
           }
         }
       }
-    }},
-  "defaultProject": "ngx-select-dropdown"
+    }
+  }
 }
